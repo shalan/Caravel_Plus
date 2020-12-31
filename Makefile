@@ -16,17 +16,31 @@
 
 # cannot commit files larger than 100 MB to GitHub
 FILE_SIZE_LIMIT_MB = 100
-LARGE_FILES := $(shell find ./gds -type f -name "*.gds")
-LARGE_FILES += $(shell find . -type f -size +$(FILE_SIZE_LIMIT_MB)M -not -path "./.git/*" -not -path "./gds/*" -not -path "./openlane/*")
 
-COMPRESS ?= xz
-UNCOMPRESS ?= xz -d
-ARCHIVE_EXT ?= xz
+# Commands to be used to compress/uncompress files
+# they must operate **in place** (otherwise, modify the target to delete the
+# intermediate file/archive)
+COMPRESS ?= gzip -n --best
+UNCOMPRESS ?= gzip -d
+ARCHIVE_EXT ?= gz
 
-LARGE_FILES_GZ := $(addsuffix .$(ARCHIVE_EXT), $(LARGE_FILES))
+# The following variables are to build static pattern rules
 
+# Needed to rebuild archives that were previously split
+SPLIT_FILES := $(shell find . -type f -name "*.$(ARCHIVE_EXT).00.split")
+SPLIT_FILES_SOURCES := $(basename $(basename $(basename $(SPLIT_FILES))))
+
+# Needed to uncompress the existing archives
 ARCHIVES := $(shell find . -type f -name "*.$(ARCHIVE_EXT)")
 ARCHIVE_SOURCES := $(basename $(ARCHIVES))
+
+# Needed to compress and split files/archives that are too large
+LARGE_FILES := $(shell find ./gds -type f -name "*.gds")
+LARGE_FILES += $(shell find . -type f -size +$(FILE_SIZE_LIMIT_MB)M -not -path "./.git/*" -not -path "./gds/*" -not -path "./openlane/*")
+LARGE_FILES_GZ := $(addsuffix .$(ARCHIVE_EXT), $(LARGE_FILES))
+LARGE_FILES_GZ_SPLIT := $(addsuffix .$(ARCHIVE_EXT).00.split, $(LARGE_FILES))
+# consider splitting existing archives
+LARGE_FILES_GZ_SPLIT += $(addsuffix .00.split, $(ARCHIVES))
 
 # PDK setup configs
 THREADS ?= $(shell nproc)
@@ -34,7 +48,7 @@ STD_CELL_LIBRARY ?= sky130_fd_sc_hd
 SPECIAL_VOLTAGE_LIBRARY ?= sky130_fd_sc_hvl
 IO_LIBRARY ?= sky130_fd_io
 SKYWATER_COMMIT ?= 3d7617a1acb92ea883539bcf22a632d6361a5de4
-OPEN_PDKS_COMMIT ?= 32cdb2097fd9a629c91e8ea33e1f6de08ab25946
+OPEN_PDKS_COMMIT ?= debc0a49b00d93416e0efd82f26f7604ae1e7a3a
 
 .DEFAULT_GOAL := ship
 # We need portable GDS_FILE pointers...
@@ -50,35 +64,58 @@ ship: check-env uncompress
 
 .PHONY: clean
 clean:
-	echo "clean"
-
+	cd ./verilog/dv/caravel/mgmt_soc/ && \
+		$(MAKE) -j$(THREADS) clean
+	cd ./verilog/dv/caravel/user_proj_example/ && \
+		$(MAKE) -j$(THREADS) clean
 
 
 .PHONY: verify
 verify:
-	echo "verify"
+	cd ./verilog/dv/caravel/mgmt_soc/ && \
+		$(MAKE) -j$(THREADS) all
+	cd ./verilog/dv/caravel/user_proj_example/ && \
+		$(MAKE) -j$(THREADS) all
 
 
 
+#####
 $(LARGE_FILES_GZ): %.$(ARCHIVE_EXT): %
 	@if ! [ $(suffix $<) == ".$(ARCHIVE_EXT)" ]; then\
 		$(COMPRESS) $< > /dev/null &&\
 		echo "$< -> $@";\
 	fi
 
+$(LARGE_FILES_GZ_SPLIT): %.$(ARCHIVE_EXT).00.split: %.$(ARCHIVE_EXT)
+	@if [ -n "$$(find "$<" -prune -size +$(FILE_SIZE_LIMIT_MB)M)" ]; then\
+		split $< -b $(FILE_SIZE_LIMIT_MB)M $<. -d --additional-suffix=.split &&\
+		rm $< &&\
+		echo -n "$< -> $$(ls $<.*.split)" | tr '\n' ' ' && echo "";\
+	fi
+
 # This target compresses all files larger than $(FILE_SIZE_LIMIT_MB) MB
 .PHONY: compress
-compress: $(LARGE_FILES_GZ)
+compress: $(LARGE_FILES_GZ) $(LARGE_FILES_GZ_SPLIT)
 	@echo "Files larger than $(FILE_SIZE_LIMIT_MB) MBytes are compressed!"
 
 
 
+#####
 $(ARCHIVE_SOURCES): %: %.$(ARCHIVE_EXT)
-	@$(UNCOMPRESS) $< &&\
-	echo "$< -> $@";\
+	@$(UNCOMPRESS) $<
+	@echo "$< -> $@"
+
+.SECONDEXPANSION:
+$(SPLIT_FILES_SOURCES): %: $$(sort $$(wildcard %.$(ARCHIVE_EXT).*.split))
+	@cat $? > $@.$(ARCHIVE_EXT)
+	@rm $?
+	@echo "$? -> $@.$(ARCHIVE_EXT)"
+	@$(UNCOMPRESS) $@.$(ARCHIVE_EXT)
+	@echo "$@.$(ARCHIVE_EXT) -> $@"
+
 
 .PHONY: uncompress
-uncompress: $(ARCHIVE_SOURCES)
+uncompress: $(SPLIT_FILES_SOURCES) $(ARCHIVE_SOURCES)
 	@echo "All files are uncompressed!"
 
 
@@ -112,7 +149,7 @@ $(LVS_BLOCKS): lvs-% : ./mag/%.mag ./verilog/gl/%.v
 	mkdir -p ./spi/lvs/tmp
 	sh ./spi/lvs/run_lvs.sh ./spi/lvs/$*.spice ./verilog/gl/$*.v $*
 	@echo ""
-	python3 ./scripts/count_lvs.py -f ./verilog/gl/$*.v_comp.json
+	python3 ./scripts/count_lvs.py -f ./verilog/gl/$*.v_comp.json | tee ./spi/lvs/tmp/$*.lvs.summary.log
 	mv -f ./verilog/gl/*{.out,.json,.log} ./spi/lvs/tmp 2> /dev/null || true
 	@echo ""
 	@echo "LVS: ./spi/lvs/$*.spice vs. ./verilog/gl/$*.v"
@@ -146,7 +183,7 @@ $(LVS_MAGLEF_BLOCKS): lvs-maglef-% : ./mag/%.mag ./verilog/gl/%.v
 	mkdir -p ./spi/lvs/tmp
 	sh ./spi/lvs/run_lvs.sh ./spi/lvs/$*.spice ./verilog/gl/$*.v $*
 	@echo ""
-	python3 ./scripts/count_lvs.py -f ./verilog/gl/$*.v_comp.json
+	python3 ./scripts/count_lvs.py -f ./verilog/gl/$*.v_comp.json | tee ./spi/lvs/tmp/$*.maglef.lvs.summary.log
 	mv -f ./verilog/gl/*{.out,.json,.log} ./spi/lvs/tmp 2> /dev/null || true
 	@echo ""
 	@echo "LVS: ./spi/lvs/$*.spice vs. ./verilog/gl/$*.v"
@@ -188,10 +225,10 @@ mag2gds: check-env
 help:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
 
-		
+
 ###########################################################################
 .PHONY: pdk
-pdk: skywater-pdk skywater-library open_pdks build-pdk
+pdk: skywater-pdk skywater-library skywater-timing open_pdks build-pdk
 
 $(PDK_ROOT)/skywater-pdk:
 	git clone https://github.com/google/skywater-pdk.git $(PDK_ROOT)/skywater-pdk
@@ -207,9 +244,11 @@ skywater-library: check-env $(PDK_ROOT)/skywater-pdk
 	cd $(PDK_ROOT)/skywater-pdk && \
 		git submodule update --init libraries/$(STD_CELL_LIBRARY)/latest && \
 		git submodule update --init libraries/$(IO_LIBRARY)/latest && \
-		git submodule update --init libraries/$(SPECIAL_VOLTAGE_LIBRARY)/latest && \
-		$(MAKE) -j$(THREADS) timing
+		git submodule update --init libraries/$(SPECIAL_VOLTAGE_LIBRARY)/latest
 
+skywater-timing: check-env $(PDK_ROOT)/skywater-pdk
+	cd $(PDK_ROOT)/skywater-pdk && \
+		$(MAKE) -j$(THREADS) timing
 ### OPEN_PDKS
 $(PDK_ROOT)/open_pdks:
 	git clone https://github.com/RTimothyEdwards/open_pdks.git $(PDK_ROOT)/open_pdks
@@ -228,7 +267,7 @@ build-pdk: check-env $(PDK_ROOT)/open_pdks $(PDK_ROOT)/skywater-pdk
 		rm -rf $(PDK_ROOT)/sky130A) || \
 		true
 	cd $(PDK_ROOT)/open_pdks && \
-		./configure --with-sky130-source=$(PDK_ROOT)/skywater-pdk/libraries --with-sky130-local-path=$(PDK_ROOT) && \
+		./configure --enable-sky130-pdk=$(PDK_ROOT)/skywater-pdk/libraries --with-sky130-local-path=$(PDK_ROOT) && \
 		cd sky130 && \
 		$(MAKE) veryclean && \
 		$(MAKE) && \
@@ -256,7 +295,7 @@ README.rst: README.src.rst docs/source/getting-started.rst docs/source/tool-vers
 		rst_include include README.src.rst - | \
 			sed \
 				-e's@\.\/\_static@\/docs\/source\/\_static@g' \
-				-e's@:ref:`tool-versioning`@`tool-versioning`_@g' \
+				-e's@:doc:`tool-versioning`@`tool-versioning.rst <./docs/source/tool-versioning.rst>`__@g' \
 				-e's@.. note::@**NOTE:**@g' \
 				-e's@.. warning::@**WARNING:**@g' \
 				> README.rst && \
