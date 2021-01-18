@@ -19,7 +19,7 @@
 .SUFFIXES:
 .SILENT: clean all
 
-PATTERNS = io_ports la_test1 la_test2
+PATTERNS = mem
 
 all:  ${PATTERNS}
 	for i in ${PATTERNS}; do \
