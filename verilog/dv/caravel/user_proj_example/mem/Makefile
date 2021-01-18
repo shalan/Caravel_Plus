@@ -14,7 +14,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-
 FIRMWARE_PATH = ../..
 VERILOG_PATH = ../../../..
 RTL_PATH = $(VERILOG_PATH)/rtl
@@ -29,7 +28,7 @@ SIM?=RTL
 
 .SUFFIXES:
 
-PATTERN = la_test2
+PATTERN = mem
 
 all:  ${PATTERN:=.vcd}
 
@@ -37,8 +36,8 @@ hex:  ${PATTERN:=.hex}
 
 %.vvp: %_tb.v %.hex
 ifeq ($(SIM),RTL)
-	iverilog -DFUNCTIONAL -DSIM -I $(BEHAVIOURAL_MODELS) \
-	-I $(PDK_PATH) -I $(IP_PATH) -I $(RTL_PATH) \
+	iverilog -DFUNCTIONAL -DSIM -DUSE_DFFRAM_BEH -I $(BEHAVIOURAL_MODELS) \
+	-I $(PDK_PATH) -I $(IP_PATH) -I $(RTL_PATH) -I .. \
 	$< -o $@ 
 else  
 	iverilog -DFUNCTIONAL -DSIM -DGL -I $(BEHAVIOURAL_MODELS) \
