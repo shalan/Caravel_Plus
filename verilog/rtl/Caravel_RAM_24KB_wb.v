@@ -1,4 +1,4 @@
-module mem_wb (
+module Caravel_RAM_24KB_wb (
     // Wishbone Interface
     input wb_clk_i,
     input wb_rst_i,
@@ -56,6 +56,6 @@ module mem_wb (
     assign WE = wen;
     assign EN = valid;
     assign Di = wb_dat_i;
-    assign A = wb_adr_i;
+    assign A = wb_adr_i[14:2];
 
 endmodule

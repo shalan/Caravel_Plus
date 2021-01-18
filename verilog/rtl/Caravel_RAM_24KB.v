@@ -1,4 +1,8 @@
 module Caravel_RAM_24KB (
+`ifdef USE_POWER_PINS
+    VPWR,
+    VGND,
+`endif
     CLK,
     WE,
     EN,
@@ -6,6 +10,12 @@ module Caravel_RAM_24KB (
     Do,
     A
 );
+
+`ifdef USE_POWER_PINS
+    input VPWR;
+    input VGND;
+`endif
+
     input           CLK;
     input   [3:0]   WE;
     input           EN;
@@ -14,6 +24,10 @@ module Caravel_RAM_24KB (
     input   [12:0]   A;
   
     RAM_6Kx32 RAM0 (
+    `ifdef USE_POWER_PINS
+        .VPWR(VPWR),
+        .VGND(VGND),
+    `endif
         .CLK(CLK),
         .WE(WE),
         .EN(EN),

@@ -1,5 +1,9 @@
 //`define USE_DFFRAM_BEH
 module RAM_6Kx32 (
+`ifdef USE_POWER_PINS
+    VPWR,
+    VGND,
+`endif
     CLK,
     WE,
     EN,
@@ -7,6 +11,10 @@ module RAM_6Kx32 (
     Do,
     A
 );
+`ifdef USE_POWER_PINS
+    input VPWR;
+    input VGND;
+`endif
     input           CLK;
     input   [3:0]   WE;
     input           EN;
@@ -26,9 +34,13 @@ module RAM_6Kx32 (
 `ifdef USE_DFFRAM_BEH
 	DFFRAM_beh 
 `else
-	DFFRAM
+	DFFRAM_4KB
 `endif
             #(.COLS(4)) RAM (
+            `ifdef USE_POWER_PINS
+                .VPWR(VPWR),
+                .VGND(VGND),
+            `endif
                 .CLK(CLK),
                 .WE(WE),
                 .EN(_EN_[gi]),
