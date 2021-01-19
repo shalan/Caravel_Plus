@@ -10,7 +10,7 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module DFFRAM_4kb #( parameter COLS=4)
+module DFFRAM_4KB #( parameter COLS=4)
 (
     CLK,
     WE,
