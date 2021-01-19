@@ -9,7 +9,8 @@ set ::env(ROUTING_CORES) 16
 
 # Change if needed
 set ::env(VERILOG_FILES) "\
-	$script_dir/../../verilog/rtl/DFFRAM.v \
+	$script_dir/../../verilog/rtl/defines.v \
+	$script_dir/../../verilog/rtl/DFFRAM_4KB.v \
 	$script_dir/../../verilog/rtl/DFFRAMBB.v \
 	$script_dir/../../verilog/rtl/RAM_6Kx32.v"
 	

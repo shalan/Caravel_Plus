@@ -52,12 +52,14 @@ set ::env(MAGIC_GENERATE_LEF) 0
 set ::env(SYNTH_READ_BLACKBOX_LIB) 1
 
 set ::env(VERILOG_FILES) "\
+	$script_dir/../../verilog/rtl/defines.v 
 	$script_dir/../../verilog/rtl/user_project_wrapper.v 
 	$script_dir/../../verilog/rtl/Caravel_RAM_24KB_wb.v
 	$script_dir/../../verilog/rtl/Caravel_RAM_24KB.v
 	$script_dir/../../verilog/rtl/DFFRAMBB.v"
 
 set ::env(VERILOG_FILES_BLACKBOX) "\
+	$script_dir/../../verilog/rtl/defines.v 
 	$script_dir/../../verilog/rtl/DFFRAM.v
 	$script_dir/../../verilog/rtl/RAM_6Kx32.v"
 
