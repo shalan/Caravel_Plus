@@ -1,0 +1,15 @@
+Design Name: user_project_wrapper
+Run Directory: /project/openlane/user_project_wrapper/runs/user_project_wrapper
+Source not found.
+----------------------------------------
+
+LVS Summary:
+Source: /project/openlane/user_project_wrapper/runs/user_project_wrapper/results/lvs/user_project_wrapper.lvs_parsed.lef.log
+LVS reports no net, device, pin, or property mismatches.
+Total errors = 0
+----------------------------------------
+
+Antenna Summary:
+Source: /project/openlane/user_project_wrapper/runs/user_project_wrapper/reports/routing//28-antenna.rpt
+Number of pins violated: 4
+Number of nets violated: 3
