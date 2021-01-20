@@ -15,7 +15,7 @@ module RAM_2x4KB (
 
     wire    [31:0]  Do_0, Do_1;
 
-    DFFRAM_4KB #(.COLS(2)) RAM0 (
+    DFFRAM_4KB #(.COLS(4)) RAM0 (
                 .CLK(CLK),
                 .WE(WE),
                 .EN(~A[10]),
@@ -24,7 +24,7 @@ module RAM_2x4KB (
                 .A(A[9:0])
             );
     
-    DFFRAM_4KB #(.COLS(2)) RAM1 (
+    DFFRAM_4KB #(.COLS(4)) RAM1 (
                 .CLK(CLK),
                 .WE(WE),
                 .EN(A[10]),
