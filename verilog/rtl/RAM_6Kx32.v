@@ -48,9 +48,9 @@ module RAM_6Kx32 (
     endgenerate 
     
     // The block decoder
-    assign _EN_[0] = A[12:10] == 3'd0;
-    assign _EN_[1] = A[12:10] == 3'd1;
-    assign _EN_[2] = A[12:10] == 3'd2;
+    assign _EN_[0] = A[12:11] == 2'd0;
+    assign _EN_[1] = A[12:11] == 2'd1;
+    assign _EN_[2] = A[12:11] == 2'd2;
     
     // Output Data multiplexor
     assign Do_pre = (A[12:11] == 2'd0) ? _Do_[0] : 
