@@ -1,4 +1,8 @@
 module RAM_2x4KB (
+`ifdef USE_POWER_PINS
+    VPWR,
+    VGND,
+`endif
     CLK,
     WE,
     EN,
@@ -6,6 +10,11 @@ module RAM_2x4KB (
     Do,
     A
 );
+
+`ifdef USE_POWER_PINS
+   input VPWR;
+   input VGND;
+`endif
     input           CLK;
     input   [3:0]   WE;
     input           EN;
@@ -16,6 +25,10 @@ module RAM_2x4KB (
     wire    [31:0]  Do_0, Do_1;
 
     DFFRAM_4KB #(.COLS(4)) RAM0 (
+    `ifdef USE_POWER_PINS
+            .VPWR(VPWR),
+            .VGND(VGND),
+    `endif
                 .CLK(CLK),
                 .WE(WE),
                 .EN(~A[10]),
@@ -25,6 +38,10 @@ module RAM_2x4KB (
             );
     
     DFFRAM_4KB #(.COLS(4)) RAM1 (
+    `ifdef USE_POWER_PINS
+            .VPWR(VPWR),
+            .VGND(VGND),
+    `endif
                 .CLK(CLK),
                 .WE(WE),
                 .EN(A[10]),
