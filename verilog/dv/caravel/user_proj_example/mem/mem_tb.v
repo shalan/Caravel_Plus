@@ -34,10 +34,9 @@
 `endif
 
 `include "RAM_6Kx32.v"
+`include "RAM_2x4KB.v"
 `include "Caravel_RAM_24KB_wb.v"
 `include "Caravel_RAM_24KB.v"
-
-
 
 module mem_tb;
 	reg clock;
