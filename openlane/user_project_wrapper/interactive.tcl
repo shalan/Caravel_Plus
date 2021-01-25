@@ -27,10 +27,13 @@ place_io_ol
 
 apply_def_template
 
-set margin_x 15
-set margin_y 400
+set margin_x 30
+set margin_y 380
+set ram_width 950
 
-add_macro_placement ram.RAM0 $margin_x $margin_y N
+add_macro_placement _587_ $margin_x $margin_y N
+add_macro_placement _588_ [expr {$margin_x+$ram_width+5}] $margin_y N
+add_macro_placement _589_ [expr {$margin_x+2*($ram_width+5)}] $margin_y N
 
 manual_macro_placement f
 
@@ -39,11 +42,11 @@ tap_decap_or
 set ::env(_VDD_NET_NAME) vccd1
 set ::env(_GND_NET_NAME) vssd1
 set ::env(_V_OFFSET) 14
-set ::env(_H_OFFSET) $::env(_V_OFFSET)
+set ::env(_H_OFFSET) 14
 set ::env(_V_PITCH) 180
 set ::env(_H_PITCH) 180
 set ::env(_V_PDN_OFFSET) 0
-set ::env(_H_PDN_OFFSET) 0
+set ::env(_H_PDN_OFFSET) 0.24
 set ::env(_SPACING) 1.7
 set ::env(_WIDTH) 3
 

@@ -33,7 +33,8 @@ set ::env(FP_IO_VTHICKNESS_MULT) 4
 set ::env(FP_IO_HTHICKNESS_MULT) 4
 
 # set ::env(PL_SKIP_INITIAL_PLACEMENT) 1
-set ::env(PL_BASIC_PLACEMENT) 1
+# set ::env(PL_BASIC_PLACEMENT) 1
+set ::env(PL_RANDOM_INITIAL_PLACEMENT) 1
 
 set ::env(CLOCK_PORT) "wb_clk_i"
 set ::env(CLOCK_NET) "wb_clk_i"
@@ -41,9 +42,13 @@ set ::env(CLOCK_NET) "wb_clk_i"
 set ::env(CLOCK_PERIOD) "10"
 
 set ::env(PL_OPENPHYSYN_OPTIMIZATIONS) 0
-set ::env(DIODE_INSERTION_STRATEGY) 0
+set ::env(DIODE_INSERTION_STRATEGY) 4
 
-set ::env(PL_TARGET_DENSITY) 0.4
+set ::env(FP_HORIZONTAL_HALO) 30
+set ::env(FP_VERTICAL_HALO) 5
+
+set ::env(PL_TARGET_DENSITY) 0.01
+# set ::env(PL_TARGET_DENSITY_CELLS) 0.01
 
 # Need to fix a FastRoute bug for this to work, but it's good
 # for a sense of "isolation"
@@ -56,15 +61,16 @@ set ::env(VERILOG_FILES) "\
 	$script_dir/../../verilog/rtl/user_project_wrapper.v 
 	$script_dir/../../verilog/rtl/Caravel_RAM_24KB_wb.v
 	$script_dir/../../verilog/rtl/Caravel_RAM_24KB.v
+	$script_dir/../../verilog/rtl/RAM_6Kx32.v
 	$script_dir/../../verilog/rtl/DFFRAMBB.v"
 
 set ::env(VERILOG_FILES_BLACKBOX) "\
 	$script_dir/../../verilog/rtl/defines.v 
 	$script_dir/../../verilog/rtl/DFFRAM.v
-	$script_dir/../../verilog/rtl/RAM_6Kx32.v"
+	$script_dir/../../verilog/rtl/RAM_2x4KB.v"
 
 set ::env(EXTRA_LEFS) "\
-	$script_dir/../../lef/RAM_6Kx32.lef"
+	$script_dir/../../lef/RAM_2x4KB.lef"
 
 set ::env(EXTRA_GDS_FILES) "\
-	$script_dir/../../gds/RAM_6Kx32.gds"
+	$script_dir/../../gds/RAM_2x4KB.gds"
