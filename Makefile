@@ -47,8 +47,8 @@ THREADS ?= $(shell nproc)
 STD_CELL_LIBRARY ?= sky130_fd_sc_hd
 SPECIAL_VOLTAGE_LIBRARY ?= sky130_fd_sc_hvl
 IO_LIBRARY ?= sky130_fd_io
-SKYWATER_COMMIT ?= 3d7617a1acb92ea883539bcf22a632d6361a5de4
-OPEN_PDKS_COMMIT ?= debc0a49b00d93416e0efd82f26f7604ae1e7a3a
+SKYWATER_COMMIT ?= f6f76f3dc99526c6fc2cfede19b5b1227d4ebde7
+OPEN_PDKS_COMMIT ?= 95c92cc563e00b3ee3ed9863b352304943e8ff8f
 
 .DEFAULT_GOAL := ship
 # We need portable GDS_FILE pointers...
@@ -57,10 +57,19 @@ ship: check-env uncompress
 	@echo "###############################################"
 	@echo "Generating Caravel GDS (sources are in the 'gds' directory)"
 	@sleep 1
-	@cp gds/caravel.gds gds/caravel.old.gds && echo "Copying old Caravel to gds/caravel.old.gds" || true
-	@cd gds && MAGTYPE=mag magic -rcfile ${PDK_ROOT}/sky130A/libs.tech/magic/current/sky130A.magicrc -noc -dnull gen_caravel.tcl < /dev/null
-
-
+	@echo "\
+		random seed `scripts/set_user_id.py -report`; \
+		gds readonly true; \
+		gds rescale false; \
+		gds read ../gds/user_project_wrapper.gds; \
+		load caravel -dereference;\
+		select top cell;\
+		gds write caravel.gds; \
+		exit;" > ./mag/mag2gds_caravel.tcl
+	@cd mag && PDKPATH=${PDK_ROOT}/sky130A magic -noc -dnull mag2gds_caravel.tcl < /dev/null
+	@rm ./mag/mag2gds_caravel.tcl
+	@mv -f ./gds/caravel.gds ./gds/caravel.old.gds
+	mv ./mag/caravel.gds ./gds
 
 .PHONY: clean
 clean:
@@ -119,13 +128,39 @@ uncompress: $(SPLIT_FILES_SOURCES) $(ARCHIVE_SOURCES)
 	@echo "All files are uncompressed!"
 
 
+# verify that the wrapper was respected
+xor-wrapper:
+	# first erase the user's user_project_wrapper.gds
+	sh utils/erase_box.sh gds/user_project_wrapper.gds 0 0 2920 3520
+	# do the same for the empty wrapper
+	sh utils/erase_box.sh gds/user_project_wrapper_empty.gds 0 0 2920 3520
+	mkdir -p signoff/user_project_wrapper_xor
+	# XOR the two resulting layouts
+	sh utils/xor.sh \
+		gds/user_project_wrapper_empty_erased.gds gds/user_project_wrapper_erased.gds \
+		user_project_wrapper user_project_wrapper.xor.xml
+	sh utils/xor.sh \
+		gds/user_project_wrapper_empty_erased.gds gds/user_project_wrapper_erased.gds \
+		user_project_wrapper gds/user_project_wrapper.xor.gds > signoff/user_project_wrapper_xor/xor.log
+	rm gds/user_project_wrapper_empty_erased.gds gds/user_project_wrapper_erased.gds
+	mv gds/user_project_wrapper.xor.gds gds/user_project_wrapper.xor.xml signoff/user_project_wrapper_xor
+	python utils/parse_klayout_xor_log.py \
+		-l signoff/user_project_wrapper_xor/xor.log \
+		-o signoff/user_project_wrapper_xor/total.txt
+	# screenshot the result for convenience
+	sh utils/scrotLayout.sh \
+		$(PDK_ROOT)/sky130A/libs.tech/klayout/sky130A.lyt \
+		signoff/user_project_wrapper_xor/user_project_wrapper.xor.gds
+
 # LVS
 BLOCKS = $(shell cd openlane && find * -maxdepth 0 -type d)
 LVS_BLOCKS = $(foreach block, $(BLOCKS), lvs-$(block))
 $(LVS_BLOCKS): lvs-% : ./mag/%.mag ./verilog/gl/%.v
 	echo "Extracting $*"
 	mkdir -p ./mag/tmp
-	echo "load $* -dereference;\
+	echo "addpath hexdigits;\
+		addpath \$$PDKPATH/libs.ref/sky130_ml_xx_hd/mag;\
+		load $* -dereference;\
 		select top cell;\
 		foreach cell [cellname list children] {\
 			load \$$cell -dereference;\
@@ -141,7 +176,9 @@ $(LVS_BLOCKS): lvs-% : ./mag/%.mag ./verilog/gl/%.v
 		ext2spice $*.ext;\
 		feedback save extract_$*.log;\
 		exit;" > ./mag/extract_$*.tcl
-	cd mag && export MAGTYPE=maglef; magic -rcfile ${PDK_ROOT}/sky130A/libs.tech/magic/current/sky130A.magicrc -noc -dnull extract_$*.tcl < /dev/null
+	cd mag && \
+		export MAGTYPE=maglef; \
+		magic -rcfile ${PDK_ROOT}/sky130A/libs.tech/magic/current/sky130A.magicrc -noc -dnull extract_$*.tcl < /dev/null
 	mv ./mag/$*.spice ./spi/lvs
 	rm ./mag/*.ext
 	mv -f ./mag/extract_$*.{tcl,log} ./mag/tmp
@@ -208,19 +245,6 @@ $(ANTENNA_BLOCKS): antenna-% : ./gds/%.gds
 	mv -f ./gds/*.ext ./gds/tmp/
 	@echo "Antenna result: ./gds/tmp/$*.antenna"
 
-mag2gds: check-env
-	echo "\
-		gds readonly true; \
-		gds rescale false; \
-		load caravel -dereference;\
-		select top cell;\
-		gds write caravel.gds; \
-		exit;" > ./mag/mag2gds_caravel.tcl
-	@cd mag && PDKPATH=${PDK_ROOT}/sky130A magic -noc -dnull mag2gds_caravel.tcl < /dev/null
-	@rm ./mag/mag2gds_caravel.tcl
-	mv -f ./gds/caravel.gds ./gds/caravel.old.gds
-	mv ./mag/caravel.gds ./gds
-
 .PHONY: help
 help:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
@@ -251,7 +275,7 @@ skywater-timing: check-env $(PDK_ROOT)/skywater-pdk
 		$(MAKE) -j$(THREADS) timing
 ### OPEN_PDKS
 $(PDK_ROOT)/open_pdks:
-	git clone https://github.com/RTimothyEdwards/open_pdks.git $(PDK_ROOT)/open_pdks
+	git clone git://opencircuitdesign.com/open_pdks $(PDK_ROOT)/open_pdks
 
 .PHONY: open_pdks
 open_pdks: check-env $(PDK_ROOT)/open_pdks
@@ -267,21 +291,22 @@ build-pdk: check-env $(PDK_ROOT)/open_pdks $(PDK_ROOT)/skywater-pdk
 		rm -rf $(PDK_ROOT)/sky130A) || \
 		true
 	cd $(PDK_ROOT)/open_pdks && \
-		./configure --enable-sky130-pdk=$(PDK_ROOT)/skywater-pdk/libraries --with-sky130-local-path=$(PDK_ROOT) && \
+		./configure --enable-alpha-lib --enable-sky130-pdk=$(PDK_ROOT)/skywater-pdk/libraries --with-sky130-local-path=$(PDK_ROOT) && \
 		cd sky130 && \
+		sed -i 's/REPO_PATH = ~\/gits/REPO_PATH = \$$\(PDK_ROOT\)\/open_pdks\/libs/g' Makefile && \
 		$(MAKE) veryclean && \
 		$(MAKE) && \
-		$(MAKE) install-local
+		$(MAKE) install-local && \
+		$(MAKE) clean
 
 .RECIPE: manifest
-manifest:
-	cd verilog/rtl/ && \
-	find * -type f ! -name "user_*.v" ! -name "manifest" ! -name "README" ! -name "defines.v" -exec shasum {} \; > manifest && \
-	cd ../../maglef/ && \
-	shasum *.mag > manifest && \
-	cd ../mag/ && \
-	shasum caravel.mag .magicrc > manifest
-
+manifest: mag/ maglef/ verilog/rtl/ scripts/ Makefile
+	touch manifest && \
+	find verilog/rtl/* -type f ! -name "user_*.v" ! -name "manifest" ! -name "README" ! -name "defines.v" -exec shasum {} \; > manifest && \
+	find maglef/*.mag -type f ! -name "user_project_wrapper.mag" -exec shasum {} \; >> manifest && \
+	shasum mag/caravel.mag mag/.magicrc >> manifest
+	shasum scripts/set_user_id.py scripts/generate_fill.py scripts/compositor.py >> manifest
+	shasum lef/user_project_wrapper_empty.lef >> manifest
 
 check-env:
 ifndef PDK_ROOT
